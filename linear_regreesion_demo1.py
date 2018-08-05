@@ -28,24 +28,16 @@ def generate_samples(sample_size, mean, cov, diff, regression):
         # print("class_ind", class_ind)
         Y0 = np.asarray(np.hstack(class_ind), dtype=np.float32)
 
-    # X = np.random.shuffle(X0)
-    # Y = np.random.shuffle(Y0)
-
     return X0, Y0
-
-
-# mean = np.array([2, 0])
-# cov = np.array([[1, 0], [0, 1]])
-# diff = np.array([3, 1])
 
 
 num_class = 2
 mean = np.random.randn(num_class) + 3
 cov = np.eye(num_class)
-X, Y = generate_samples(200, mean, cov, [3, 3], False)
-print("==========generate samples as followings:")
-print(X)
-print(Y)
+X, Y = generate_samples(200, mean, cov, [3.0], False)
+# print("==========generate samples as followings:")
+# print(X)
+# print(Y)
 
 colors = ['r' if l == 0 else 'b' for l in Y[:]]
 plt.scatter(X[:, 0], X[:, 1], c=colors)
@@ -68,21 +60,33 @@ optimizer = tf.train.AdamOptimizer(0.04)
 train = optimizer.minimize(loss)
 
 max_epochs = 50
-mini_batch_size = 20
+mini_batch_size = 25
+
+print("len of X =", len(X))
+print("len of Y =", len(Y))
 
 with tf.Session() as sess:
     sess.run(tf.global_variables_initializer())
 
     for epoch in range(max_epochs):
 
-        for i in range(np.int32(len(Y) / mini_batch_size)):
+        for i in range(np.int32(len(X) / mini_batch_size)):
+            print("+++++++++++i=", i)
             x1 = X[i * mini_batch_size:(i + 1) * mini_batch_size]
-            y1 = np.reshape(Y[i * mini_batch_size:(i + 1) * mini_batch_size], [-1, 1])
-
-            # print("x1:", x1)
-            # print("y1:", y1)
+            y1 = np.reshape(Y[i * 2 * mini_batch_size:(i * 2 + 1) * mini_batch_size], [-1, 1])
 
             _, lossval, outputval = sess.run([train, loss, output], feed_dict={input_feature: x1, input_labels: y1})
             print("##done! lossval:", lossval, "outputval:", outputval)
 
         print("epoch:", '%04d' % (epoch + 1), "cost=", "{:.9f}".format(lossval))
+
+    print("W=", sess.run(W))
+    print("b=", sess.run(b))
+    print(" sess.run(W)[0] =", sess.run(W)[0], " sess.run(W)[1]", sess.run(W)[1])
+    print("sess.run(W)[0] / sess.run(W)[1] =", sess.run(W)[0] / sess.run(W)[1])
+    print("sess.run(b) / sess.run(W)[1] = ", sess.run(b) / sess.run(W)[1])
+    x = np.linspace(0, 10, 200)
+    y = -x * (sess.run(W)[0] / sess.run(W)[1]) - sess.run(b)/ sess.run(W)[1]
+    plt.plot(x, y, label='Fitted line')
+    plt.legend()
+    plt.show()
