@@ -2,39 +2,28 @@ import tensorflow as tf
 import numpy as np
 import matplotlib.pyplot as plt
 
-
-def generate_samples(sample_size, mean, cov, diff, regression):
-    num_class = 2
-    sample_per_class = int(sample_size / 2)
-    X0 = np.random.multivariate_normal(mean, cov, sample_per_class)
-    Y0 = np.zeros(sample_per_class)
-    # print("normal samples X0:", X0)
-    # print("zeros Y0:", Y0)
+#
+# 生成樣本數組
+#
+def generate_samples(num, mean, cov, diff):
+    X0 = np.random.multivariate_normal(mean, cov, num)
+    Y0 = np.zeros(num)
 
     for ci, d in enumerate(diff):
-        moved_mean = mean + d
-        # print(ci, "##", d, "## moved_mean=", moved_mean)
-        X1 = np.random.multivariate_normal(moved_mean, cov, sample_per_class)
-        Y1 = (ci + 1) * np.ones(sample_per_class)
-        # print ("X1", X1)
-        # print ("Y1", Y1)
+        X1 = np.random.multivariate_normal(mean + d, cov, num)
+        Y1 = (ci + 1) * np.ones(num)
 
         X0 = np.concatenate((X0, X1))
         Y0 = np.concatenate((Y0, Y1))
-    # print("X0", X0)
-    # print("Y0", Y0)
-    if regression == False:
-        class_ind = [Y0 == class_number for class_number in range(num_class)]
-        # print("class_ind", class_ind)
-        Y0 = np.asarray(np.hstack(class_ind), dtype=np.float32)
 
     return X0, Y0
 
-
+np.random.seed(10)
 num_class = 2
-mean = np.random.randn(num_class) + 3
+
+mean = np.random.randn(num_class)
 cov = np.eye(num_class)
-X, Y = generate_samples(200, mean, cov, [3.0], False)
+X, Y = generate_samples(200, mean, cov, [3])
 # print("==========generate samples as followings:")
 # print(X)
 # print(Y)
@@ -54,39 +43,37 @@ W = tf.Variable(tf.random_normal([input_dim, lab_dim]), name="weight")
 b = tf.Variable(tf.zeros([lab_dim]), name="bias")
 
 output = tf.nn.sigmoid(tf.matmul(input_feature, W) + b)
-cross_entropy = -(input_labels * tf.log(output) + (1 - input_labels) * tf.log(1 - output))
+cross_entropy = -(input_labels * tf.log(tf.clip_by_value(output, 1e-10,1.0)) + (1 - input_labels) * tf.log(tf.clip_by_value(1 - output, 1e-10,1.0)))
+ser = tf.square(input_labels - output)
+err = tf.reduce_mean(ser)
 loss = tf.reduce_mean(cross_entropy)
-optimizer = tf.train.AdamOptimizer(0.04)
-train = optimizer.minimize(loss)
+optimizer = tf.train.AdamOptimizer(0.04).minimize(loss)
 
 max_epochs = 50
 mini_batch_size = 25
 
-print("len of X =", len(X))
-print("len of Y =", len(Y))
+# print("len of X =", len(X))
+# print("len of Y =", len(Y))
 
 with tf.Session() as sess:
     sess.run(tf.global_variables_initializer())
 
     for epoch in range(max_epochs):
-
+        print("===============================")
+        sum_err = 0
         for i in range(np.int32(len(X) / mini_batch_size)):
-            print("+++++++++++i=", i)
-            x1 = X[i * mini_batch_size:(i + 1) * mini_batch_size]
-            y1 = np.reshape(Y[i * 2 * mini_batch_size:(i * 2 + 1) * mini_batch_size], [-1, 1])
+            # print("+++++++++++i=", i)
+            x1 = X[i * mini_batch_size:(i + 1) * mini_batch_size,:]
+            y1 = np.reshape(Y[i * mini_batch_size:(i + 1) * mini_batch_size], [-1, 1])
 
-            _, lossval, outputval = sess.run([train, loss, output], feed_dict={input_feature: x1, input_labels: y1})
-            print("##done! lossval:", lossval, "outputval:", outputval)
+            _, lossval, outputval, errval = sess.run([optimizer, loss, output, err], feed_dict={input_feature: x1, input_labels: y1})
+            sum_err = sum_err + errval
+            # print("##done! lossval:", lossval, "sum err:", sum_err)
 
-        print("epoch:", '%04d' % (epoch + 1), "cost=", "{:.9f}".format(lossval))
+        print("epoch:", '%04d' % (epoch + 1), "cost=", "{:.9f}".format(lossval), "err=", sum_err/mini_batch_size)
 
-    print("W=", sess.run(W))
-    print("b=", sess.run(b))
-    print(" sess.run(W)[0] =", sess.run(W)[0], " sess.run(W)[1]", sess.run(W)[1])
-    print("sess.run(W)[0] / sess.run(W)[1] =", sess.run(W)[0] / sess.run(W)[1])
-    print("sess.run(b) / sess.run(W)[1] = ", sess.run(b) / sess.run(W)[1])
     x = np.linspace(0, 10, 200)
-    y = -x * (sess.run(W)[0] / sess.run(W)[1]) - sess.run(b)/ sess.run(W)[1]
+    y = -x * (sess.run(W)[0] / sess.run(W)[1]) - sess.run(b) / sess.run(W)[1]
     plt.plot(x, y, label='Fitted line')
     plt.legend()
     plt.show()

@@ -58,3 +58,8 @@ concate1 = np.concatenate((a1, a2), axis=1)
 print(concate1, ", shape:", np.shape(concate1))
 concate2 = np.concatenate((a1, a2), axis=-1)
 print(concate2, ", shape:", np.shape(concate2))
+
+print("######demo multivariate_normal ######")
+mean = np.array([0,1])
+cov = np.eye(2)
+print("multivariate_normal: ", np.random.multivariate_normal(mean, cov, 3))
